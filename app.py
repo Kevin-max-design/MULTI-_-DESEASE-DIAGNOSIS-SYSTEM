@@ -189,7 +189,7 @@ elif disease_type == "Pancreatitis":
         if st.button("Diagnose CT Scan via CNN"):
             with st.spinner("Analyzing CT scan through DenseNet-121 pipeline..."):
                 try:
-                    result_class, confidence = predict_pancreatitis(uploaded_ct, pancreatitis_model)
+                    result_class, confidence, grad_cam_fig = predict_pancreatitis(uploaded_ct, pancreatitis_model)
                     st.divider()
                     if result_class == "Pancreatitis":
                         st.error(f"🚨 **Diagnosis: {result_class.upper()}** (Confidence: {confidence:.2%})")
@@ -198,5 +198,10 @@ elif disease_type == "Pancreatitis":
                     else:
                         st.success(f"✅ **Diagnosis: {result_class.upper()}** (Confidence: {confidence:.2%})")
                         st.markdown("Pancreatic region appears within normal limits. No obvious signs of acute or chronic pancreatitis.")
+                    
+                    # Display the Grad-CAM analysis figure
+                    st.subheader("🔬 Grad-CAM Pattern Analysis")
+                    st.markdown("The heatmap below highlights the regions of the CT scan that the CNN focused on to make its prediction. **Red/yellow** regions indicate high activation (areas of interest), while **blue** regions had minimal influence.")
+                    st.pyplot(grad_cam_fig)
                 except Exception as e:
                     st.error(f"Error processing CT scan: {str(e)}")
