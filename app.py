@@ -42,39 +42,52 @@ if disease_type == "Breast Cancer":
     else:
         model = model_data["model"]
         feature_names = model_data["feature_names"]
-        target_names = model_data["target_names"] # ['malignant' 'benign']
+        target_names = model_data["target_names"]
+        scaler = model_data.get("scaler", None)
+        algorithm = model_data.get("algorithm", "Unknown")
         
-        # We will use the top 5 most important features for simplicity in the UI,
-        # but the standard dataset requires all 30.
-        # So we'll auto-fill the median values for 25 features and let user tweak the top 5.
+        st.info(f"🧠 **Auto-selected algorithm: {algorithm}** (best from 9 candidates via 5-fold cross-validation)")
         
-        importances = model.feature_importances_
-        # Sort and get top 5 indices
-        top_indices = np.argsort(importances)[::-1][:5]
-        top_feature_names = [feature_names[i] for i in top_indices]
+        # Key features with realistic ranges from the Wisconsin dataset
+        feature_ranges = {
+            "mean radius": (6.0, 30.0, 14.0), "mean texture": (9.0, 40.0, 19.0),
+            "mean perimeter": (40.0, 190.0, 92.0), "mean area": (140.0, 2500.0, 655.0),
+            "mean smoothness": (0.05, 0.17, 0.10), "mean compactness": (0.02, 0.35, 0.10),
+            "mean concavity": (0.0, 0.43, 0.09), "mean concave points": (0.0, 0.2, 0.05),
+            "mean symmetry": (0.1, 0.3, 0.18), "mean fractal dimension": (0.05, 0.1, 0.06),
+            "radius error": (0.1, 3.0, 0.4), "texture error": (0.3, 5.0, 1.2),
+            "perimeter error": (0.7, 22.0, 2.9), "area error": (6.0, 550.0, 40.0),
+            "smoothness error": (0.001, 0.03, 0.007), "compactness error": (0.002, 0.14, 0.025),
+            "concavity error": (0.0, 0.4, 0.03), "concave points error": (0.0, 0.05, 0.01),
+            "symmetry error": (0.007, 0.08, 0.02), "fractal dimension error": (0.0, 0.03, 0.004),
+            "worst radius": (7.0, 37.0, 16.0), "worst texture": (12.0, 50.0, 25.0),
+            "worst perimeter": (50.0, 260.0, 107.0), "worst area": (185.0, 4250.0, 880.0),
+            "worst smoothness": (0.07, 0.23, 0.13), "worst compactness": (0.02, 1.1, 0.25),
+            "worst concavity": (0.0, 1.3, 0.27), "worst concave points": (0.0, 0.3, 0.11),
+            "worst symmetry": (0.15, 0.66, 0.29), "worst fractal dimension": (0.05, 0.21, 0.08),
+        }
         
-        st.subheader("Key Measurements")
-        col1, col2 = st.columns(2)
+        st.subheader("Patient Measurements (30 Features)")
+        st.caption("All 30 features from the breast mass FNA (Fine Needle Aspirate). Adjust values to match the patient's report.")
         
         user_inputs = {}
-        for i, fname in enumerate(top_feature_names):
+        col1, col2 = st.columns(2)
+        for i, fname in enumerate(feature_names):
+            mn, mx, default = feature_ranges.get(fname, (0.0, 50.0, 15.0))
+            step = (mx - mn) / 500
             with (col1 if i % 2 == 0 else col2):
-                # Standard typical ranges for these features just for UI mock sliders
-                user_inputs[fname] = st.slider(f"{fname}", 0.0, 50.0, 15.0, 0.1)
-                
-        if st.button("Diagnose Breast Cancer"):
-            # Create a full feature array with zeros (or realistic medians normally)
-            # This is simplified for the demo since the model expects 30 inputs.
-            full_features = np.zeros((1, len(feature_names)))
-            for i, fname in enumerate(feature_names):
-                if fname in user_inputs:
-                    full_features[0, i] = user_inputs[fname]
-                else:
-                    # Provide an arbitrary mean/median safe value for unspecified features
-                    full_features[0, i] = 1.0 # placeholder
+                user_inputs[fname] = st.slider(fname, float(mn), float(mx), float(default), float(step))
+        
+        if st.button("🔍 Diagnose Breast Cancer"):
+            input_df = pd.DataFrame([user_inputs])
             
-            prediction_idx = model.predict(full_features)[0]
-            probability = np.max(model.predict_proba(full_features)[0])
+            if scaler is not None:
+                input_scaled = pd.DataFrame(scaler.transform(input_df), columns=input_df.columns)
+            else:
+                input_scaled = input_df
+            
+            prediction_idx = model.predict(input_scaled)[0]
+            probability = np.max(model.predict_proba(input_scaled)[0])
             
             result_class = target_names[prediction_idx]
             
@@ -85,6 +98,7 @@ if disease_type == "Breast Cancer":
             else:
                 st.success(f"✅ **Diagnosis: {result_class.upper()}** (Confidence: {probability:.2%})")
                 st.markdown("The mass appears to be benign. Continue regular screenings.")
+
 
 # ------------- Diabetes Logic -------------
 elif disease_type == "Diabetes":
@@ -99,6 +113,9 @@ elif disease_type == "Diabetes":
         feature_names = model_data["feature_names"]
         target_names = model_data["target_names"]
         scaler = model_data.get("scaler", None)
+        algorithm = model_data.get("algorithm", "Unknown")
+        
+        st.info(f"🧠 **Auto-selected algorithm: {algorithm}** (best from 9 candidates via 5-fold cross-validation)")
         
         st.subheader("Patient Vitals")
         st.caption("Adjust the values below to match the patient's medical record. Normal reference ranges are shown.")
