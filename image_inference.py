@@ -173,9 +173,33 @@ def predict_pneumonia(image_file, model):
 # ═══════════════════════════════════════════════════════════════════
 
 def load_pancreatitis_model():
+    """
+    Loads DenseNet-121 for pancreatitis CT classification.
+    Auto-loads fine-tuned weights from models/pancreatitis_densenet121.pth 
+    if available, otherwise uses ImageNet pre-trained weights as baseline.
+    """
     model = models.densenet121(weights=models.DenseNet121_Weights.IMAGENET1K_V1)
     num_ftrs = model.classifier.in_features
-    model.classifier = nn.Linear(num_ftrs, 2)
+    
+    # Classifier head matching the training script architecture
+    model.classifier = nn.Sequential(
+        nn.Dropout(0.4),
+        nn.Linear(num_ftrs, 256),
+        nn.ReLU(),
+        nn.Dropout(0.2),
+        nn.Linear(256, 2)
+    )
+    
+    # Check for fine-tuned weights
+    checkpoint_path = os.path.join(os.path.dirname(__file__), "models", "pancreatitis_densenet121.pth")
+    if os.path.exists(checkpoint_path):
+        model.load_state_dict(torch.load(checkpoint_path, map_location=torch.device('cpu')))
+        model._is_fine_tuned = True
+        print(f"✅ Loaded fine-tuned pancreatitis weights from {checkpoint_path}")
+    else:
+        model._is_fine_tuned = False
+        print("ℹ  Using baseline ImageNet weights (no fine-tuned model found)")
+    
     model.eval()
     return model
 

@@ -211,6 +211,12 @@ elif disease_type == "Pancreatitis":
     st.header("Pancreatitis Diagnosis (CT Scan Imaging)")
     st.markdown("Upload a patient abdominal **CT scan** image to detect signs of pancreatitis using a pre-trained DenseNet-121 Deep Learning pipeline.")
     
+    # Show model status
+    if hasattr(pancreatitis_model, '_is_fine_tuned') and pancreatitis_model._is_fine_tuned:
+        st.success("🧠 **Model: Fine-tuned DenseNet-121** — Trained on custom CT scan dataset")
+    else:
+        st.warning("🧠 **Model: Baseline DenseNet-121 (ImageNet weights)** — Run `python train_pancreatitis.py` with your CT scans to fine-tune for better accuracy")
+    
     st.info("💡 **Tip:** For best results, upload axial CT scan slices focused on the pancreatic region. Supported formats: `.png`, `.jpg`, `.jpeg`, `.bmp`, `.tiff`")
     
     uploaded_ct = st.file_uploader("Upload CT Scan Image", type=["png", "jpg", "jpeg", "bmp", "tiff"], key="ct_upload")
