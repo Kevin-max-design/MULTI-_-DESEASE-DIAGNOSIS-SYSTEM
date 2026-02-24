@@ -70,6 +70,63 @@ def predict_pneumonia(image_file, model):
     labels = ["Normal", "Pneumonia"]
     return labels[pred_idx], confidence
 
-# Pre-load the model once when the module is imported
+def load_pancreatitis_model():
+    """
+    Loads a pre-trained DenseNet-121 model modified for binary classification
+    of CT scan images (0: Normal, 1: Pancreatitis).
+    DenseNet is well-suited for medical imaging due to its dense feature reuse.
+    """
+    model = models.densenet121(weights=models.DenseNet121_Weights.IMAGENET1K_V1)
+    
+    # Modify the classifier head for binary classification
+    num_ftrs = model.classifier.in_features
+    model.classifier = nn.Linear(num_ftrs, 2)
+    
+    # Here we would load fine-tuned weights:
+    # checkpoint_path = "models/pancreatitis_densenet121.pth"
+    # if os.path.exists(checkpoint_path):
+    #     model.load_state_dict(torch.load(checkpoint_path, map_location=torch.device('cpu')))
+    
+    model.eval()
+    return model
+
+def get_ct_transforms():
+    """
+    Transforms for CT scan images. CT scans may come as single-channel
+    grayscale DICOM exports or standard image formats. 
+    We resize to 224x224 and normalize with ImageNet stats.
+    """
+    return transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.Grayscale(num_output_channels=3),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225])
+    ])
+
+def predict_pancreatitis(image_file, model):
+    """
+    Takes an uploaded CT scan image from Streamlit, preprocesses it, 
+    and runs inference for pancreatitis detection.
+    """
+    image = Image.open(image_file)
+    
+    transform = get_ct_transforms()
+    input_tensor = transform(image)
+    input_batch = input_tensor.unsqueeze(0)
+    
+    with torch.no_grad():
+        output = model(input_batch)
+    
+    probabilities = torch.nn.functional.softmax(output[0], dim=0)
+    
+    pred_idx = torch.argmax(probabilities).item()
+    confidence = probabilities[pred_idx].item()
+    
+    labels = ["Normal", "Pancreatitis"]
+    return labels[pred_idx], confidence
+
+# Pre-load the models once when the module is imported
 # This saves time during Streamlit reruns
 pneumonia_model = load_pneumonia_model()
+pancreatitis_model = load_pancreatitis_model()

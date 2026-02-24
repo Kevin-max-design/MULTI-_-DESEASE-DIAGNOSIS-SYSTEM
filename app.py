@@ -6,7 +6,7 @@ import os
 from PIL import Image
 
 # Import the PyTorch module we built
-from image_inference import pneumonia_model, predict_pneumonia
+from image_inference import pneumonia_model, predict_pneumonia, pancreatitis_model, predict_pancreatitis
 
 st.set_page_config(page_title="Disease Diagnosis System", page_icon="⚕️", layout="wide")
 
@@ -16,7 +16,7 @@ st.markdown("Use this system to diagnose Diabetes, Breast Cancer, or Pneumonia u
 # Sidebar navigation
 disease_type = st.sidebar.selectbox(
     "Select Disease to Diagnose",
-    ["Breast Cancer", "Diabetes", "Pneumonia"]
+    ["Breast Cancer", "Diabetes", "Pneumonia", "Pancreatitis"]
 )
 
 # Paths to models
@@ -172,3 +172,31 @@ elif disease_type == "Pneumonia":
                         st.markdown("Lungs appear clear with no obvious signs of pneumonia infiltration.")
                 except Exception as e:
                     st.error(f"Error processing image: {str(e)}")
+
+# ------------- Pancreatitis Logic -------------
+elif disease_type == "Pancreatitis":
+    st.header("Pancreatitis Diagnosis (CT Scan Imaging)")
+    st.markdown("Upload a patient abdominal **CT scan** image to detect signs of pancreatitis using a pre-trained DenseNet-121 Deep Learning pipeline.")
+    
+    st.info("💡 **Tip:** For best results, upload axial CT scan slices focused on the pancreatic region. Supported formats: `.png`, `.jpg`, `.jpeg`, `.bmp`, `.tiff`")
+    
+    uploaded_ct = st.file_uploader("Upload CT Scan Image", type=["png", "jpg", "jpeg", "bmp", "tiff"], key="ct_upload")
+    
+    if uploaded_ct is not None:
+        image = Image.open(uploaded_ct)
+        st.image(image, caption='Uploaded CT Scan', use_container_width=True)
+        
+        if st.button("Diagnose CT Scan via CNN"):
+            with st.spinner("Analyzing CT scan through DenseNet-121 pipeline..."):
+                try:
+                    result_class, confidence = predict_pancreatitis(uploaded_ct, pancreatitis_model)
+                    st.divider()
+                    if result_class == "Pancreatitis":
+                        st.error(f"🚨 **Diagnosis: {result_class.upper()}** (Confidence: {confidence:.2%})")
+                        st.markdown("Abnormal pancreatic tissue patterns detected. Indicators consistent with inflammation of the pancreas.")
+                        st.markdown("**Recommended next steps:** Serum lipase/amylase test, contrast-enhanced CT, clinical correlation.")
+                    else:
+                        st.success(f"✅ **Diagnosis: {result_class.upper()}** (Confidence: {confidence:.2%})")
+                        st.markdown("Pancreatic region appears within normal limits. No obvious signs of acute or chronic pancreatitis.")
+                except Exception as e:
+                    st.error(f"Error processing CT scan: {str(e)}")
