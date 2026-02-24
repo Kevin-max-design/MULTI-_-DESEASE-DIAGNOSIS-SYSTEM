@@ -97,55 +97,71 @@ elif disease_type == "Diabetes":
     else:
         model = model_data["model"]
         feature_names = model_data["feature_names"]
-        target_names = model_data["target_names"] # ['Negative', 'Positive']
+        target_names = model_data["target_names"]
+        scaler = model_data.get("scaler", None)
         
         st.subheader("Patient Vitals")
+        st.caption("Adjust the values below to match the patient's medical record. Normal reference ranges are shown.")
         col1, col2 = st.columns(2)
         
-        # Pima Diabetes exact feature order
-        # ['preg', 'plas', 'pres', 'skin', 'insu', 'mass', 'pedi', 'age']
-        preg = col1.number_input("Pregnancies", 0, 20, 1)
-        plas = col2.slider("Glucose (plas)", 0, 200, 100)
-        pres = col1.slider("Blood Pressure (pres)", 0, 140, 70)
-        skin = col2.slider("Skin Thickness", 0, 100, 20)
-        insu = col1.slider("Insulin", 0, 900, 80)
-        mass = col2.slider("BMI (mass)", 0.0, 70.0, 25.0, 0.1)
-        pedi = col1.slider("Diabetes Pedigree Function (pedi)", 0.0, 2.5, 0.5, 0.01)
-        age = col2.number_input("Age", 1, 120, 30)
+        preg = col1.number_input("🤰 Pregnancies", 0, 20, 1, help="Number of times pregnant")
+        plas = col2.slider("🩸 Glucose (mg/dL)  [Normal: 70–140]", 0, 200, 120)
+        pres = col1.slider("💓 Blood Pressure (mm Hg)  [Normal: 60–80]", 0, 140, 72)
+        skin = col2.slider("📏 Skin Thickness (mm)  [Normal: 10–50]", 0, 100, 29)
+        insu = col1.slider("💉 Insulin (mu U/ml)  [Normal: 16–166]", 0, 900, 125)
+        mass = col2.slider("⚖️ BMI  [Normal: 18.5–24.9]", 0.0, 70.0, 32.0, 0.1)
+        pedi = col1.slider("🧬 Diabetes Pedigree Function  [Normal: 0.0–1.0]", 0.0, 2.5, 0.47, 0.01)
+        age = col2.number_input("🎂 Age", 1, 120, 33)
 
-        if st.button("Diagnose Diabetes"):
-            # Ensure proper feature order
-            # The exact names depend on dataset fetch, but typically match the load order
+        if st.button("🔍 Diagnose Diabetes"):
             features_dict = {
-                'preg': preg, 'plas': plas, 'pres': pres, 'skin': skin, 
-                'insu': insu, 'mass': mass, 'pedi': pedi, 'age': age
+                'preg': float(preg), 'plas': float(plas), 'pres': float(pres), 
+                'skin': float(skin), 'insu': float(insu), 'mass': float(mass), 
+                'pedi': float(pedi), 'age': float(age)
             }
             
-            # Match input array mapping to trained column names if possible
-            # Assuming standard order or passing a dataframe
             input_df = pd.DataFrame([features_dict])
             
-            try:
-                # If column names match exactly this works perfectly
-                prediction_idx = model.predict(input_df)[0]
-                probability = np.max(model.predict_proba(input_df)[0])
-                
-                result_class = target_names[prediction_idx]
-                
-                st.divider()
-                if result_class == 'Positive':
-                    st.warning(f"⚠️ **Diagnosis: {result_class.upper()}** (Confidence: {probability:.2%})")
-                    st.markdown("Patient exhibits markers for diabetes. Recommend a clinical HbA1c test.")
-                else:
-                    st.success(f"✅ **Diagnosis: {result_class.upper()}** (Confidence: {probability:.2%})")
-                    st.markdown("Patient tests negative for diabetes markers.")
-            except Exception as e:
-                st.error("Feature mapping failed (dataset version mismatch). Showing blind prediction.")
-                # Fallback if pandas column alignment fails
-                arr = np.array([[preg, plas, pres, skin, insu, mass, pedi, age]])
-                prediction_idx = model.predict(arr)[0]
-                result_class = target_names[prediction_idx]
-                st.info(f"Result: {result_class}")
+            # Apply the scaler if available (matches the training pipeline)
+            if scaler is not None:
+                input_scaled = pd.DataFrame(scaler.transform(input_df), columns=input_df.columns)
+            else:
+                input_scaled = input_df
+            
+            prediction_idx = int(model.predict(input_scaled)[0])
+            proba = model.predict_proba(input_scaled)[0]
+            probability = float(np.max(proba))
+            positive_prob = float(proba[1])
+            
+            result_class = target_names[prediction_idx]
+            
+            st.divider()
+            if result_class == 'Positive':
+                st.warning(f"⚠️ **Diagnosis: {result_class.upper()}** (Confidence: {probability:.2%})")
+                st.markdown("Patient exhibits markers for diabetes. Recommend a clinical HbA1c test.")
+            else:
+                st.success(f"✅ **Diagnosis: {result_class.upper()}** (Confidence: {probability:.2%})")
+                st.markdown("Patient tests negative for diabetes markers.")
+            
+            # Risk factor breakdown
+            st.subheader("📊 Risk Factor Analysis")
+            risk_data = {
+                "Factor": ["Glucose", "BMI", "Age", "Blood Pressure", "Insulin", "Pedigree"],
+                "Value": [plas, mass, age, pres, insu, pedi],
+                "Normal Range": ["70–140 mg/dL", "18.5–24.9", "< 45", "60–80 mm Hg", "16–166 mu U/ml", "0.0–1.0"],
+                "Status": [
+                    "🔴 High" if plas > 140 else ("🟡 Borderline" if plas > 120 else "🟢 Normal"),
+                    "🔴 Obese" if mass > 30 else ("🟡 Overweight" if mass > 25 else "🟢 Normal"),
+                    "🟡 Risk factor" if age > 45 else "🟢 Normal",
+                    "🔴 High" if pres > 90 else ("🟡 Elevated" if pres > 80 else "🟢 Normal"),
+                    "🔴 High" if insu > 166 else ("🟡 Low" if insu < 16 else "🟢 Normal"),
+                    "🔴 High" if pedi > 1.0 else ("🟡 Moderate" if pedi > 0.5 else "🟢 Normal"),
+                ]
+            }
+            st.table(pd.DataFrame(risk_data))
+            
+            # Show diabetes probability gauge
+            st.metric("Diabetes Probability", f"{positive_prob:.1%}")
 
 # ------------- Pneumonia Logic -------------
 elif disease_type == "Pneumonia":

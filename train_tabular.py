@@ -37,30 +37,44 @@ def train_breast_cancer_model(model_dir):
 
 def train_diabetes_model(model_dir):
     print("Loading Diabetes dataset...")
-    # Fetching Pima Indians Diabetes database from OpenML
-    # id 37 is standard Pima diabetes dataset
     diabetes = fetch_openml(name="diabetes", version=1, as_frame=True, parser="auto")
     df = diabetes.frame
     
-    # Target is 'class', values 'tested_negative' and 'tested_positive'
     X = df.drop(columns=['class'])
-    
-    # Map target to 0 and 1
     y = df['class'].map({'tested_negative': 0, 'tested_positive': 1})
     
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Feature scaling for better model performance
+    from sklearn.preprocessing import StandardScaler
+    scaler = StandardScaler()
+    X_scaled = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
     
-    print("Training Random Forest for Diabetes...")
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42, stratify=y)
+    
+    # Calculate class weight ratio for imbalanced data
+    neg_count = (y_train == 0).sum()
+    pos_count = (y_train == 1).sum()
+    scale_pos_weight = neg_count / pos_count
+    
+    print("Training XGBoost for Diabetes...")
+    from xgboost import XGBClassifier
+    model = XGBClassifier(
+        n_estimators=200,
+        max_depth=5,
+        learning_rate=0.1,
+        scale_pos_weight=scale_pos_weight,
+        eval_metric='logloss',
+        random_state=42
+    )
     model.fit(X_train, y_train)
     
     y_pred = model.predict(X_test)
     print("Diabetes Model Accuracy:", accuracy_score(y_test, y_pred))
+    print(classification_report(y_test, y_pred, target_names=['Negative', 'Positive']))
     
-    # Save model
     model_path = os.path.join(model_dir, "diabetes_model.pkl")
     joblib.dump({
         "model": model,
+        "scaler": scaler,
         "feature_names": X.columns.tolist(),
         "target_names": ['Negative', 'Positive']
     }, model_path)
